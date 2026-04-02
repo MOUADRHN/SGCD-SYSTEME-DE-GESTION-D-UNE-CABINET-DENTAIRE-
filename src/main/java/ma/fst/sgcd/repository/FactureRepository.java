@@ -100,7 +100,15 @@ public class FactureRepository implements IRepository<Facture, Long> {
             return rs.next() ? rs.getDouble(1) : 0;
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
-
+    public boolean marquerEmailEnvoye(Long id) {
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement("UPDATE facture SET emailEnvoye=TRUE WHERE idFacture=?")) {
+            ps.setLong(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
     @Override public boolean update(Facture f) { return false; }
     @Override public boolean delete(Long id)    { return false; }
 }

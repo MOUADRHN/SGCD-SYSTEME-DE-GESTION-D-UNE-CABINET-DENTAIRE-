@@ -7,7 +7,6 @@ import ma.fst.sgcd.model.RendezVous;
 import ma.fst.sgcd.model.Utilisateur;
 import ma.fst.sgcd.model.enums.MotifRDV;
 import ma.fst.sgcd.model.enums.Role;
-import ma.fst.sgcd.model.enums.StatutRDV;
 import ma.fst.sgcd.repository.*;
 import ma.fst.sgcd.service.*;
 
@@ -16,14 +15,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * GET  /rdv            → liste du jour
- * GET  /rdv?action=add → formulaire ajout
- * GET  /rdv?date=YYYY-MM-DD → liste par date
- * POST /rdv?action=save    → planifier
- * POST /rdv?action=statut  → changer statut (arrivee, encours, termine, annuler)
- * POST /rdv?action=delete  → supprimer
+ * GET  /rdv                       → agenda du jour
+ * GET  /rdv?action=add            → formulaire ajout
+ * GET  /rdv?date=YYYY-MM-DD       → agenda par date
+ * GET  /rdv?q=texte               → recherche dans les RDV
+ * POST /rdv?action=save           → planifier
+ * POST /rdv?action=statut         → changer statut
+ * POST /rdv?action=delete         → supprimer
  */
 @WebServlet("/rdv")
 public class RendezVousServlet extends HttpServlet {
@@ -60,13 +61,28 @@ public class RendezVousServlet extends HttpServlet {
 
     private void showList(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
+        String q         = req.getParameter("q");
         String dateParam = req.getParameter("date");
-        LocalDate date = (dateParam != null && !dateParam.isBlank())
-                         ? LocalDate.parse(dateParam) : LocalDate.now();
+        LocalDate date   = (dateParam != null && !dateParam.isBlank())
+                ? LocalDate.parse(dateParam) : LocalDate.now();
+
         List<RendezVous> rdvList = rdvService.findByDate(date);
-        req.setAttribute("rdvList", rdvList);
-        req.setAttribute("dateSelected", date);
-        req.setAttribute("statutRDVValues", StatutRDV.values());
+
+        // Recherche textuelle
+        if (q != null && !q.isBlank()) {
+            String qLow = q.toLowerCase();
+            rdvList = rdvList.stream().filter(rv ->
+                    (rv.getNomPatient()    != null && rv.getNomPatient().toLowerCase().contains(qLow)) ||
+                            (rv.getPrenomPatient() != null && rv.getPrenomPatient().toLowerCase().contains(qLow)) ||
+                            (rv.getNomDentiste()   != null && rv.getNomDentiste().toLowerCase().contains(qLow)) ||
+                            rv.getMotif().getLibelle().toLowerCase().contains(qLow) ||
+                            rv.getStatut().getLibelle().toLowerCase().contains(qLow)
+            ).collect(Collectors.toList());
+        }
+
+        req.setAttribute("rdvList",       rdvList);
+        req.setAttribute("dateSelected",  date);
+        req.setAttribute("searchQuery",   q);
         req.getRequestDispatcher("/views/rdv/list.jsp").forward(req, resp);
     }
 
@@ -85,8 +101,8 @@ public class RendezVousServlet extends HttpServlet {
         rv.setMotif(MotifRDV.valueOf(req.getParameter("motif")));
         rv.setNotes(req.getParameter("notes"));
         rv.setDuree(Integer.parseInt(req.getParameter("duree")));
-        LocalDate date   = LocalDate.parse(req.getParameter("date"));
-        LocalTime heure  = LocalTime.parse(req.getParameter("heure"));
+        LocalDate date  = LocalDate.parse(req.getParameter("date"));
+        LocalTime heure = LocalTime.parse(req.getParameter("heure"));
         rv.setDateHeure(LocalDateTime.of(date, heure));
         Utilisateur u = (Utilisateur) req.getSession().getAttribute("utilisateur");
         if (u != null && u.getRole() == Role.ASSISTANTE) rv.setIdAssistante(u.getIdUtilisateur());
@@ -99,10 +115,10 @@ public class RendezVousServlet extends HttpServlet {
         Long id     = Long.parseLong(req.getParameter("id"));
         String type = req.getParameter("type");
         switch (type) {
-            case "arrivee"  -> rdvService.marquerArrivee(id);
-            case "encours"  -> rdvService.marquerEnCours(id);
-            case "termine"  -> rdvService.marquerTermine(id);
-            case "annuler"  -> rdvService.annuler(id);
+            case "arrivee" -> rdvService.marquerArrivee(id);
+            case "encours" -> rdvService.marquerEnCours(id);
+            case "termine" -> rdvService.marquerTermine(id);
+            case "annuler" -> rdvService.annuler(id);
         }
         String referer = req.getHeader("Referer");
         resp.sendRedirect(referer != null ? referer : req.getContextPath() + "/rdv");

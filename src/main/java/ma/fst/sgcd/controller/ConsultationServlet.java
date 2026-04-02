@@ -23,6 +23,7 @@ public class ConsultationServlet extends HttpServlet {
     private ConsultationService  service;
     private RendezVousService    rdvService;
     private PatientService       patientService;
+    private FactureRepository    factureRepo;
 
     @Override
     public void init() {
@@ -33,9 +34,10 @@ public class ConsultationServlet extends HttpServlet {
         DossierMedicalRepository dr = new DossierMedicalRepository();
         PatientRepository       pr  = new PatientRepository();
 
-        service       = new ConsultationService(cr, fr, prr, ar, dr);
-        rdvService    = new RendezVousService(new RendezVousRepository());
+        service        = new ConsultationService(cr, fr, prr, ar, dr);
+        rdvService     = new RendezVousService(new RendezVousRepository());
         patientService = new PatientService(pr, dr);
+        factureRepo    = fr;
     }
 
     @Override
@@ -55,11 +57,11 @@ public class ConsultationServlet extends HttpServlet {
         saveConsultation(req, resp);
     }
 
-    // ─── Afficher formulaire ─────────────────────────────────────────────
+    // ─── Afficher le formulaire d'ouverture de consultation ──────────────
     private void showForm(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         String idRdvParam = req.getParameter("idRdv");
-        if (idRdvParam != null) {
+        if (idRdvParam != null && !idRdvParam.isBlank()) {
             Long idRdv = Long.parseLong(idRdvParam);
             rdvService.findById(idRdv).ifPresent(rv -> req.setAttribute("rdv", rv));
         }
@@ -67,50 +69,76 @@ public class ConsultationServlet extends HttpServlet {
         req.getRequestDispatcher("/views/consultation/form.jsp").forward(req, resp);
     }
 
-    // ─── Afficher détail ─────────────────────────────────────────────────
+    // ─── Afficher le détail d'une consultation ────────────────────────────
     private void showDetail(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        Long id = Long.parseLong(req.getParameter("id"));
+
+        String idParam = req.getParameter("id");
+        if (idParam == null || idParam.isBlank()) {
+            resp.sendError(400, "Paramètre id manquant");
+            return;
+        }
+
+        Long id;
+        try {
+            id = Long.parseLong(idParam);
+        } catch (NumberFormatException e) {
+            resp.sendError(400, "Paramètre id invalide : " + idParam);
+            return;
+        }
+
         Optional<Consultation> opt = service.findById(id);
-        if (opt.isEmpty()) { resp.sendError(404); return; }
+        if (opt.isEmpty()) {
+            resp.sendError(404, "Consultation introuvable : id=" + id);
+            return;
+        }
+
         Consultation c = opt.get();
         req.setAttribute("consultation", c);
-        service.findPrescription(id).ifPresent(p -> req.setAttribute("prescription", p));
 
-        // Charger facture liée
-        new FactureRepository().findByConsultation(id)
-            .ifPresent(f -> req.setAttribute("facture", f));
+        // Prescription
+        service.findPrescription(id)
+               .ifPresent(p -> req.setAttribute("prescription", p));
+
+        // Facture — stockée dans l'attribut "facture" (pas dans consultation.facture)
+        factureRepo.findByConsultation(id)
+                   .ifPresent(f -> req.setAttribute("facture", f));
 
         req.getRequestDispatcher("/views/consultation/detail.jsp").forward(req, resp);
     }
 
-    // ─── Enregistrer consultation ────────────────────────────────────────
+    // ─── Enregistrer une consultation ─────────────────────────────────────
     private void saveConsultation(HttpServletRequest req, HttpServletResponse resp)
             throws IOException, ServletException {
+
         Utilisateur u = (Utilisateur) req.getSession().getAttribute("utilisateur");
 
-        String idRdvParam = req.getParameter("idRdv");
+        String idRdvParam     = req.getParameter("idRdv");
         String idPatientParam = req.getParameter("idPatient");
 
         // Résoudre idDossier depuis le patient
         Long idDossier = null;
         if (idPatientParam != null && !idPatientParam.isBlank()) {
-            Long idPatient = Long.parseLong(idPatientParam);
-            Optional<Patient> pOpt = patientService.findWithDetails(idPatient);
-            if (pOpt.isPresent() && pOpt.get().getDossierMedical() != null) {
-                idDossier = pOpt.get().getDossierMedical().getIdDossier();
-            }
+            try {
+                Long idPatient = Long.parseLong(idPatientParam);
+                Optional<Patient> pOpt = patientService.findWithDetails(idPatient);
+                if (pOpt.isPresent() && pOpt.get().getDossierMedical() != null) {
+                    idDossier = pOpt.get().getDossierMedical().getIdDossier();
+                }
+            } catch (NumberFormatException ignored) {}
         }
-        // Fallback: idDossier passé directement
+        // Fallback : idDossier passé directement
         if (idDossier == null) {
             String idDossierParam = req.getParameter("idDossier");
             if (idDossierParam != null && !idDossierParam.isBlank()) {
-                idDossier = Long.parseLong(idDossierParam);
+                try { idDossier = Long.parseLong(idDossierParam); }
+                catch (NumberFormatException ignored) {}
             }
         }
 
         if (idDossier == null) {
-            req.setAttribute("error", "Impossible de trouver le dossier médical du patient.");
+            req.setAttribute("error",
+                    "Impossible de trouver le dossier médical. Vérifiez que le patient est bien enregistré.");
             showForm(req, resp);
             return;
         }
@@ -122,8 +150,10 @@ public class ConsultationServlet extends HttpServlet {
         cons.setIdDossier(idDossier);
         cons.setIdDentiste(u.getIdUtilisateur());
 
-        if (idRdvParam != null && !idRdvParam.isBlank())
-            cons.setIdRDV(Long.parseLong(idRdvParam));
+        if (idRdvParam != null && !idRdvParam.isBlank()) {
+            try { cons.setIdRDV(Long.parseLong(idRdvParam)); }
+            catch (NumberFormatException ignored) {}
+        }
 
         // Actes sélectionnés
         String[] codes = req.getParameterValues("actes");
@@ -140,12 +170,14 @@ public class ConsultationServlet extends HttpServlet {
         if (cons.getIdRDV() != null) rdvService.marquerTermine(cons.getIdRDV());
 
         req.getSession().setAttribute("flash_success", "Consultation enregistrée avec succès.");
-        resp.sendRedirect(req.getContextPath() + "/consultation?action=detail&id=" + cons.getIdConsultation());
+        resp.sendRedirect(req.getContextPath()
+                + "/consultation?action=detail&id=" + cons.getIdConsultation());
     }
 
-    // ─── Enregistrer prescription ────────────────────────────────────────
+    // ─── Enregistrer une prescription ─────────────────────────────────────
     private void savePrescription(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
+
         Long idCons = Long.parseLong(req.getParameter("idConsultation"));
 
         Prescription pr = new Prescription();
@@ -172,7 +204,8 @@ public class ConsultationServlet extends HttpServlet {
         }
 
         service.prescrire(pr);
-        req.getSession().setAttribute("flash_success", "Prescription enregistrée.");
-        resp.sendRedirect(req.getContextPath() + "/consultation?action=detail&id=" + idCons);
+        req.getSession().setAttribute("flash_success", "Prescription enregistrée avec succès.");
+        resp.sendRedirect(req.getContextPath()
+                + "/consultation?action=detail&id=" + idCons);
     }
 }
