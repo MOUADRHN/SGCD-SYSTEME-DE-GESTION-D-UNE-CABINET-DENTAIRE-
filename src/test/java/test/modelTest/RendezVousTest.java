@@ -1,4 +1,4 @@
-package ma.fst.sgcd.test.modelTest;
+package test.modelTest;
 
 import ma.fst.sgcd.model.RendezVous;
 import ma.fst.sgcd.model.enums.MotifRDV;
@@ -10,7 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @DisplayName("RendezVous - Tests du modèle")
 class RendezVousTest {

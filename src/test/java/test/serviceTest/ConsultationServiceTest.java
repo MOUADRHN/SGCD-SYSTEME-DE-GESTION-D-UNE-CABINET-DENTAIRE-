@@ -1,4 +1,4 @@
-package ma.fst.sgcd.test.serviceTest;
+package test.serviceTest;
 
 import ma.fst.sgcd.model.Acte;
 import ma.fst.sgcd.model.Consultation;
@@ -23,7 +23,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ConsultationService - Tests unitaires")

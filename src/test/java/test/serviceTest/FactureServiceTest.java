@@ -1,4 +1,4 @@
-package ma.fst.sgcd.test.serviceTest;
+package test.serviceTest;
 
 import ma.fst.sgcd.model.Facture;
 import ma.fst.sgcd.model.Paiement;
@@ -19,7 +19,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FactureService - Tests unitaires")

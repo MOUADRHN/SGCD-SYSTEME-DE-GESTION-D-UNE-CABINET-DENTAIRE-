@@ -1,4 +1,4 @@
-package ma.fst.sgcd.test.serviceTest;
+package test.serviceTest;
 
 import ma.fst.sgcd.model.Utilisateur;
 import ma.fst.sgcd.model.enums.Role;

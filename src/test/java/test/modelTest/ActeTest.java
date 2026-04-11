@@ -1,11 +1,12 @@
-package ma.fst.sgcd.test.modelTest;
+package test.modelTest;
 
 import ma.fst.sgcd.model.Acte;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @DisplayName("Acte - Tests du modèle")
 class ActeTest {

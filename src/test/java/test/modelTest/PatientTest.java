@@ -1,4 +1,4 @@
-package ma.fst.sgcd.test.modelTest;
+package test.modelTest;
 
 import ma.fst.sgcd.model.DossierMedical;
 import ma.fst.sgcd.model.Patient;
