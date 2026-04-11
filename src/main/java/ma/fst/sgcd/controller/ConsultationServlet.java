@@ -70,43 +70,55 @@ public class ConsultationServlet extends HttpServlet {
     }
 
     // ─── Afficher le détail d'une consultation ────────────────────────────
+// ─── Afficher le détail d'une consultation ────────────────────────────
     private void showDetail(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
         String idParam = req.getParameter("id");
-        if (idParam == null || idParam.isBlank()) {
-            resp.sendError(400, "Paramètre id manquant");
-            return;
-        }
+        String idRdvParam = req.getParameter("idRdv");
 
-        Long id;
+        Optional<Consultation> opt = Optional.empty();
+
         try {
-            id = Long.parseLong(idParam);
+            // 1. Chercher par l'ID de la consultation (si fourni)
+            if (idParam != null && !idParam.isBlank()) {
+                opt = service.findById(Long.parseLong(idParam));
+            }
+            // 2. SINON chercher par l'ID du RDV (si on vient de l'agenda)
+            else if (idRdvParam != null && !idRdvParam.isBlank()) {
+                opt = service.findByRdv(Long.parseLong(idRdvParam));
+            }
+            // 3. Aucun des deux n'est fourni
+            else {
+                resp.sendError(400, "Paramètre id ou idRdv manquant");
+                return;
+            }
         } catch (NumberFormatException e) {
-            resp.sendError(400, "Paramètre id invalide : " + idParam);
+            resp.sendError(400, "Format d'identifiant invalide");
             return;
         }
 
-        Optional<Consultation> opt = service.findById(id);
         if (opt.isEmpty()) {
-            resp.sendError(404, "Consultation introuvable : id=" + id);
+            resp.sendError(404, "Consultation introuvable");
             return;
         }
 
         Consultation c = opt.get();
         req.setAttribute("consultation", c);
 
-        // Prescription
-        service.findPrescription(id)
-               .ifPresent(p -> req.setAttribute("prescription", p));
+        // IMPORTANT : On récupère l'ID réel de la consultation pour la suite
+        Long idConsultation = c.getIdConsultation();
 
-        // Facture — stockée dans l'attribut "facture" (pas dans consultation.facture)
-        factureRepo.findByConsultation(id)
-                   .ifPresent(f -> req.setAttribute("facture", f));
+        // Prescription
+        service.findPrescription(idConsultation)
+                .ifPresent(p -> req.setAttribute("prescription", p));
+
+        // Facture
+        factureRepo.findByConsultation(idConsultation)
+                .ifPresent(f -> req.setAttribute("facture", f));
 
         req.getRequestDispatcher("/views/consultation/detail.jsp").forward(req, resp);
     }
-
     // ─── Enregistrer une consultation ─────────────────────────────────────
     private void saveConsultation(HttpServletRequest req, HttpServletResponse resp)
             throws IOException, ServletException {

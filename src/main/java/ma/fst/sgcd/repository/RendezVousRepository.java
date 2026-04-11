@@ -12,11 +12,11 @@ import java.sql.Date;
 public class RendezVousRepository implements IRepository<RendezVous, Long> {
 
     private static final String JOIN =
-        "SELECT rv.*, p.nom AS nomPatient, p.prenom AS prenomPatient," +
-        " u.nom AS nomDentiste, u.prenom AS prenomDentiste" +
-        " FROM rendez_vous rv" +
-        " JOIN patient p ON rv.idPatient = p.idPatient" +
-        " JOIN utilisateur u ON rv.idDentiste = u.idUtilisateur";
+            "SELECT rv.*, p.nom AS nomPatient, p.prenom AS prenomPatient," +
+                    " u.nom AS nomDentiste, u.prenom AS prenomDentiste" +
+                    " FROM rendez_vous rv" +
+                    " JOIN patient p ON rv.idPatient = p.idPatient" +
+                    " JOIN utilisateur u ON rv.idDentiste = u.idUtilisateur";
 
     private RendezVous map(ResultSet rs) throws SQLException {
         RendezVous rv = new RendezVous();
@@ -126,5 +126,104 @@ public class RendezVousRepository implements IRepository<RendezVous, Long> {
              ResultSet rs = ps.executeQuery()) {
             return rs.next() ? rs.getInt(1) : 0;
         } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    public int countTotal() {
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM rendez_vous");
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    public int countByStatut(StatutRDV statut) {
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM rendez_vous WHERE statut=?")) {
+            ps.setString(1, statut.name());
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt(1) : 0; }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    public void annulerRdvDepasses() {
+        String sql = "UPDATE rendez_vous SET statut = 'ANNULE' WHERE statut = 'PLANIFIE' AND dateHeure < ?";
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setTimestamp(1, Timestamp.valueOf(java.time.LocalDateTime.now()));
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Erreur lors de l'annulation des RDV dépassés : " + e.getMessage());
+        }
+    }
+
+    public List<RendezVous> findTodayByDentiste(Long idDentiste) {
+        List<RendezVous> list = new ArrayList<>();
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(JOIN + " WHERE DATE(rv.dateHeure)=CURDATE() AND rv.idDentiste=? ORDER BY rv.dateHeure")) {
+            ps.setLong(1, idDentiste);
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) list.add(map(rs)); }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+        return list;
+    }
+
+    public int countTodayByDentiste(Long idDentiste) {
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM rendez_vous WHERE DATE(dateHeure)=CURDATE() AND idDentiste=?")) {
+            ps.setLong(1, idDentiste);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt(1) : 0; }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    public boolean hasRdvEnCoursForDentiste(Long idDentiste) {
+        String sql = "SELECT COUNT(*) FROM rendez_vous WHERE idDentiste = ? AND statut = 'EN_COURS'";
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, idDentiste);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return false;
+    }
+
+    public List<RendezVous> findByDateAndDentiste(LocalDate date, Long idDentiste) {
+        List<RendezVous> list = new ArrayList<>();
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(JOIN + " WHERE DATE(rv.dateHeure)=? AND rv.idDentiste=? ORDER BY rv.dateHeure")) {
+            ps.setDate(1, Date.valueOf(date));
+            ps.setLong(2, idDentiste);
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) list.add(map(rs)); }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+        return list;
+    }
+
+    /** * MÉTHODE INDISPENSABLE POUR L'AJAX ET LE CHEVAUCHEMENT :
+     * Récupère les RDV d'un dentiste à une date précise pour comparer les heures.
+     */
+    public List<RendezVous> findByDentisteAndDate(Long idDentiste, LocalDate date) {
+        List<RendezVous> list = new ArrayList<>();
+        String sql = JOIN + " WHERE rv.idDentiste = ? " +
+                "AND DATE(rv.dateHeure) = ? " +
+                "AND rv.statut NOT IN ('ANNULE', 'NON_HONORE') " +
+                "ORDER BY rv.dateHeure";
+
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setLong(1, idDentiste);
+            ps.setDate(2, Date.valueOf(date));
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(map(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return list;
     }
 }

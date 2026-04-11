@@ -81,7 +81,10 @@ public class UtilisateurServlet extends HttpServlet {
         Long id = Long.parseLong(req.getParameter("id"));
         Optional<Utilisateur> opt = repo.findById(id);
         if (opt.isEmpty()) { resp.sendError(404); return; }
-        req.setAttribute("utilisateur", opt.get());
+
+        // --- ON CHANGE LE NOM ICI ---
+        req.setAttribute("userToEdit", opt.get());
+
         req.setAttribute("roles", Role.values());
         req.getRequestDispatcher("/views/admin/utilisateurs/form.jsp").forward(req, resp);
     }

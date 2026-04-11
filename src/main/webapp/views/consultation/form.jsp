@@ -21,8 +21,7 @@
         <div class="card-header" style="background:var(--teal-dark);color:#fff;">
             <c:if test="${not empty rdv}">
                 Patient : <strong>${rdv.nomCompletPatient}</strong> &nbsp;—&nbsp;
-                <fmt:formatDate value="${rdv.dateHeure}" pattern="dd/MM/yyyy HH:mm"
-                    type="both" dateStyle="short" timeStyle="short"/>
+                ${rdv.dateHeure.toLocalDate()} à ${rdv.dateHeure.toLocalTime()}
                 &nbsp;—&nbsp; Motif : ${rdv.motif.libelle}
             </c:if>
             <c:if test="${empty rdv}">Nouvelle consultation</c:if>

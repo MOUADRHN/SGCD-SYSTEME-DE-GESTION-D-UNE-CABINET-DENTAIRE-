@@ -12,7 +12,7 @@ import java.io.IOException;
  * Protège toutes les URLs sauf /auth, les ressources statiques et les pages d'erreur.
  */
 @WebFilter("/*")
-public class AuthFilter implements Filter {
+public class  AuthFilter implements Filter {
 
     private static final String[] PUBLIC_PATHS = {
         "/auth", "/css/", "/js/", "/images/", "/views/common/error"

@@ -16,14 +16,14 @@
         <a class="nav-link ${path eq '/patients' ? 'active':''}" href="${ctx}/patients">
             <i class="bi bi-people-fill"></i> Patients
         </a>
-        <c:if test="${u.role.name() ne 'ADMINISTRATEUR'}">
+        <c:if test="${u.role.name() ne 'DENTISTE' and u.role.name() ne 'ADMINISTRATEUR'}">
             <a class="nav-link ${path eq '/rdv' ? 'active':''}" href="${ctx}/rdv">
                 <i class="bi bi-calendar3"></i> Rendez-vous
             </a>
         </c:if>
         <c:if test="${u.role.name() eq 'DENTISTE'}">
             <a class="nav-link" href="${ctx}/rdv">
-                <i class="bi bi-clipboard2-pulse"></i> Consultations
+                <i class="bi bi-clipboard2-pulse"></i> Planing
             </a>
         </c:if>
         <c:if test="${u.role.name() eq 'ASSISTANTE'}">

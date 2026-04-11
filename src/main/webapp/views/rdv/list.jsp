@@ -8,9 +8,11 @@
 <div class="main-content">
     <div class="topbar">
         <h4><i class="bi bi-calendar3 me-2"></i>Rendez-vous — ${dateSelected}</h4>
+      <c:if test="${sessionScope.utilisateur.role != 'DENTISTE'}">
         <a href="${pageContext.request.contextPath}/rdv?action=add" class="btn btn-mint">
             <i class="bi bi-calendar-plus me-1"></i>Nouveau RDV
         </a>
+      </c:if>
     </div>
 
     <jsp:include page="/views/common/flash.jsp"/>
@@ -111,13 +113,45 @@
                                             </c:if>
 
                                                 <%-- Action : Ouvrir la consultation --%>
-                                            <c:if test="${rv.statut.name() eq 'EN_COURS'}">
-                                                <a href="${pageContext.request.contextPath}/consultation?action=ouvrir&idRdv=${rv.idRDV}"
-                                                   class="btn btn-sm btn-success" title="Ouvrir consultation">
-                                                    <i class="bi bi-clipboard2-pulse"></i>
-                                                </a>
-                                            </c:if>
+                                                    <c:choose>
+                                                        <%-- 1. Si l'utilisateur connecté est le DENTISTE --%>
+                                                        <c:when test="${sessionScope.utilisateur.role == 'DENTISTE'}">
+                                                            <c:choose>
+                                                                <c:when test="${rv.statut.name() == 'TERMINE'}">
+                                                                    <a href="${pageContext.request.contextPath}/consultation?action=detail&idRdv=${rv.idRDV}"
+                                                                       class="btn btn-sm btn-info" title="Voir la consultation">
+                                                                        <i class="bi bi-eye"></i> Détails
+                                                                    </a>
+                                                                </c:when>
+                                                                <c:otherwise>
+                                                                    <a href="${pageContext.request.contextPath}/consultation?action=ouvrir&idRdv=${rv.idRDV}"
+                                                                       class="btn btn-sm btn-teal" title="Ouvrir la consultation">
+                                                                        <i class="bi bi-stethoscope"></i> Ouvrir
+                                                                    </a>
+                                                                </c:otherwise>
+                                                            </c:choose>
+                                                        </c:when>
 
+                                                        <%-- 2. Si l'utilisateur connecté est une ASSISTANTE (ou secrétaire) --%>
+                                                        <c:otherwise>
+                                                            <c:choose>
+                                                                <%-- Si le RDV est terminé, elle peut voir les détails (facture, ordonnance...) --%>
+                                                                <c:when test="${rv.statut.name() == 'TERMINE'}">
+                                                                    <a href="${pageContext.request.contextPath}/consultation?action=detail&idRdv=${rv.idRDV}"
+                                                                       class="btn btn-sm btn-info" title="Voir les détails">
+                                                                        <i class="bi bi-receipt"></i> Détails
+                                                                    </a>
+                                                                </c:when>
+
+                                                                <%-- Si le RDV n'est pas encore terminé, on affiche le message de blocage --%>
+                                                                <c:otherwise>
+                                                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Seul le dentiste peut ouvrir la consultation">
+                                                                        <i class="bi bi-lock-fill"></i> Réservé au dentiste
+                                                                    </button>
+                                                                </c:otherwise>
+                                                            </c:choose>
+                                                        </c:otherwise>
+                                                    </c:choose>
                                                 <%-- Action : Annuler --%>
                                             <c:if test="${rv.statut.name() eq 'PLANIFIE' or rv.statut.name() eq 'EN_SALLE_ATTENTE'}">
                                                 <form method="post" action="${pageContext.request.contextPath}/rdv"

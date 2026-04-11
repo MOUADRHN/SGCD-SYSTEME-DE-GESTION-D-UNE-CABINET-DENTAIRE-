@@ -5,30 +5,30 @@
          https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
          version="6.0">
 
-    <display-name>SGCD</display-name>
+    <display-name>SGCD - Cabinet Dentaire</display-name>
 
-    <!-- ─── Paramètres de connexion BD ─── -->
-    <context-param>
-        <param-name>db.url</param-name>
-        <param-value>jdbc:mysql://localhost:3306/sgcd?useUnicode=true&amp;characterEncoding=UTF-8&amp;serverTimezone=Africa/Casablanca</param-value>
-    </context-param>
-    <context-param>
-        <param-name>db.user</param-name>
-        <param-value>root</param-value>
-    </context-param>
-    <context-param>
-        <param-name>db.password</param-name>
-        <param-value></param-value>
-    </context-param>
+    <!--
+        Connexion MySQL configurée dans :
+        src/main/java/ma/fst/sgcd/util/DBUtil.java
+        Modifier les constantes URL, USER, PASSWORD dans ce fichier.
+    -->
 
-    <!-- ─── Filtre d'authentification ─── -->
+    <!-- ─── Filtre d'authentification ──────────────────────────────────── -->
+    <filter>
+        <filter-name>AuthFilter</filter-name>
+        <filter-class>ma.fst.sgcd.filter.AuthFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>AuthFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
 
-    <!-- ─── Page d'accueil ─── -->
+    <!-- ─── Page d'accueil ─────────────────────────────────────────────── -->
     <welcome-file-list>
         <welcome-file>index.jsp</welcome-file>
     </welcome-file-list>
 
-    <!-- ─── Pages d'erreur ─── -->
+    <!-- ─── Pages d'erreur ─────────────────────────────────────────────── -->
     <error-page>
         <error-code>404</error-code>
         <location>/views/common/error404.jsp</location>
@@ -38,8 +38,9 @@
         <location>/views/common/error500.jsp</location>
     </error-page>
 
-    <!-- ─── Session timeout : 30 min ─── -->
+    <!-- ─── Session : timeout 30 minutes ─────────────────────────────── -->
     <session-config>
         <session-timeout>30</session-timeout>
     </session-config>
+
 </web-app>

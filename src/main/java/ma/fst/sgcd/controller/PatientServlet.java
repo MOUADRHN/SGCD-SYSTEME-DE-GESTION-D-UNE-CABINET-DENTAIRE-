@@ -10,16 +10,17 @@ import ma.fst.sgcd.service.*;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.Optional;
 
 /**
- * Gestion CRUD patients.
- * GET  /patients           → liste
- * GET  /patients?action=add → formulaire ajout
- * POST /patients?action=save → enregistrer
- * GET  /patients?action=edit&id=X → formulaire édition
- * POST /patients?action=update    → mettre à jour
- * GET  /patients?action=detail&id=X → détail + historique
+ * Gestion CRUD des patients.
+ * GET  /patients                    → liste (+ ?q= recherche)
+ * GET  /patients?action=add         → formulaire ajout
+ * POST /patients?action=save        → enregistrer
+ * GET  /patients?action=edit&id=X   → formulaire édition
+ * POST /patients?action=update      → mettre à jour
+ * GET  /patients?action=detail&id=X → dossier complet
  * POST /patients?action=delete&id=X → supprimer
  */
 @WebServlet("/patients")
@@ -28,6 +29,7 @@ public class PatientServlet extends HttpServlet {
     private PatientService      service;
     private RendezVousService   rdvService;
     private ConsultationService consultService;
+    private PatientRepository   patientRepo;
 
     @Override
     public void init() {
@@ -41,6 +43,7 @@ public class PatientServlet extends HttpServlet {
         service        = new PatientService(pr, dr);
         rdvService     = new RendezVousService(rr);
         consultService = new ConsultationService(cr, fr, prr, ar, dr);
+        patientRepo    = pr;
     }
 
     @Override
@@ -48,7 +51,6 @@ public class PatientServlet extends HttpServlet {
             throws ServletException, IOException {
         String action = req.getParameter("action");
         if (action == null) action = "list";
-
         switch (action) {
             case "add"    -> req.getRequestDispatcher("/views/patient/add.jsp").forward(req, resp);
             case "edit"   -> showEdit(req, resp);
@@ -63,7 +65,6 @@ public class PatientServlet extends HttpServlet {
         req.setCharacterEncoding("UTF-8");
         String action = req.getParameter("action");
         if (action == null) action = "save";
-
         switch (action) {
             case "save"   -> savePatient(req, resp);
             case "update" -> updatePatient(req, resp);
@@ -77,8 +78,8 @@ public class PatientServlet extends HttpServlet {
             throws ServletException, IOException {
         String q = req.getParameter("q");
         var patients = (q != null && !q.isBlank()) ? service.search(q) : service.findAll();
-        req.setAttribute("patients", patients);
-        req.setAttribute("searchQuery", q);
+        req.setAttribute("patients",     patients);
+        req.setAttribute("searchQuery",  q);
         req.getRequestDispatcher("/views/patient/list.jsp").forward(req, resp);
     }
 
@@ -101,8 +102,8 @@ public class PatientServlet extends HttpServlet {
         Patient p = opt.get();
         req.setAttribute("patient", p);
         if (p.getDossierMedical() != null) {
-            var consultations = consultService.findByDossier(p.getDossierMedical().getIdDossier());
-            req.setAttribute("consultations", consultations);
+            req.setAttribute("consultations",
+                    consultService.findByDossier(p.getDossierMedical().getIdDossier()));
         }
         req.setAttribute("rdvList", rdvService.findByPatient(id));
         req.getRequestDispatcher("/views/patient/detail.jsp").forward(req, resp);
@@ -110,7 +111,34 @@ public class PatientServlet extends HttpServlet {
 
     // ─── Enregistrer ────────────────────────────────────────────────────
     private void savePatient(HttpServletRequest req, HttpServletResponse resp)
-            throws IOException {
+            throws IOException, ServletException {
+
+        // ── Validation âge (CDC : 0 < âge < 120 ans) ────────────────────
+        LocalDate dateNaissance;
+        try {
+            dateNaissance = LocalDate.parse(req.getParameter("dateNaissance"));
+        } catch (Exception e) {
+            req.setAttribute("error", "Date de naissance invalide.");
+            req.getRequestDispatcher("/views/patient/add.jsp").forward(req, resp);
+            return;
+        }
+        int age = Period.between(dateNaissance, LocalDate.now()).getYears();
+        if (age < 0 || age >= 120) {
+            req.setAttribute("error", "Âge invalide : doit être compris entre 0 et 120 ans.");
+            req.getRequestDispatcher("/views/patient/add.jsp").forward(req, resp);
+            return;
+        }
+
+        // ── Vérification doublon (CDC : nom + date naissance) ────────────
+        String nom    = req.getParameter("nom").trim().toUpperCase();
+        String prenom = req.getParameter("prenom").trim();
+        if (patientRepo.existsByNomDateNaissance(nom, prenom, dateNaissance)) {
+            req.setAttribute("error",
+                "Un patient avec le même nom et la même date de naissance existe déjà.");
+            req.getRequestDispatcher("/views/patient/add.jsp").forward(req, resp);
+            return;
+        }
+
         Patient p = buildFromRequest(req, new Patient());
         ResponsableLegal rl = buildRL(req);
         service.enregistrer(p, rl);
@@ -120,9 +148,38 @@ public class PatientServlet extends HttpServlet {
 
     // ─── Mettre à jour ──────────────────────────────────────────────────
     private void updatePatient(HttpServletRequest req, HttpServletResponse resp)
-            throws IOException {
+            throws IOException, ServletException {
+
+        Long idPatient = Long.parseLong(req.getParameter("idPatient"));
+
+        // ── Validation âge ───────────────────────────────────────────────
+        LocalDate dateNaissance;
+        try {
+            dateNaissance = LocalDate.parse(req.getParameter("dateNaissance"));
+        } catch (Exception e) {
+            req.setAttribute("error", "Date de naissance invalide.");
+            showEdit(req, resp);
+            return;
+        }
+        int age = Period.between(dateNaissance, LocalDate.now()).getYears();
+        if (age < 0 || age >= 120) {
+            req.setAttribute("error", "Âge invalide : doit être compris entre 0 et 120 ans.");
+            showEdit(req, resp);
+            return;
+        }
+
+        // ── Vérification doublon (en excluant le patient actuel) ─────────
+        String nom    = req.getParameter("nom").trim().toUpperCase();
+        String prenom = req.getParameter("prenom").trim();
+        if (patientRepo.existsByNomDateNaissanceExcept(nom, prenom, dateNaissance, idPatient)) {
+            req.setAttribute("error",
+                "Un autre patient avec le même nom et la même date de naissance existe déjà.");
+            showEdit(req, resp);
+            return;
+        }
+
         Patient p = buildFromRequest(req, new Patient());
-        p.setIdPatient(Long.parseLong(req.getParameter("idPatient")));
+        p.setIdPatient(idPatient);
         ResponsableLegal rl = buildRL(req);
         service.modifier(p, rl);
         req.getSession().setAttribute("flash_success", "Patient mis à jour avec succès.");
@@ -133,7 +190,7 @@ public class PatientServlet extends HttpServlet {
     private void deletePatient(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
         Long id = Long.parseLong(req.getParameter("id"));
-        new PatientRepository().delete(id);
+        patientRepo.delete(id);
         req.getSession().setAttribute("flash_success", "Patient supprimé.");
         resp.sendRedirect(req.getContextPath() + "/patients");
     }

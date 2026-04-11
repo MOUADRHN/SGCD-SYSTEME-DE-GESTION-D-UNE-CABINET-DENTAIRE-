@@ -35,6 +35,10 @@ public class DashboardServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
+
+        // 🧹 On nettoie les RDV dépassés avant de charger les statistiques
+        rdvService.annulerRdvDepasses();
+
         // Statistiques rapides
         req.setAttribute("rdvAujourd'hui",   rdvService.findToday());
         req.setAttribute("rdvToday",         rdvService.findToday());

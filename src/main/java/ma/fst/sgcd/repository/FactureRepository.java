@@ -103,6 +103,7 @@ public class FactureRepository implements IRepository<Facture, Long> {
     public boolean marquerEmailEnvoye(Long id) {
         try (Connection c = DBUtil.getConnection();
              PreparedStatement ps = c.prepareStatement("UPDATE facture SET emailEnvoye=TRUE WHERE idFacture=?")) {
+
             ps.setLong(1, id);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -111,4 +112,24 @@ public class FactureRepository implements IRepository<Facture, Long> {
     }
     @Override public boolean update(Facture f) { return false; }
     @Override public boolean delete(Long id)    { return false; }
+
+    /** CA par dentiste — statistiques admin (CDC). */
+    public List<Object[]> caParDentiste() {
+        String sql = "SELECT u.nom, u.prenom, COALESCE(SUM(f.montantTotal),0) AS ca " +
+                     "FROM utilisateur u " +
+                     "LEFT JOIN consultation co ON co.idDentiste = u.idUtilisateur " +
+                     "LEFT JOIN facture f ON f.idConsultation = co.idConsultation AND f.statut='PAYEE' " +
+                     "WHERE u.role = 'DENTISTE' AND u.statut = 'ACTIF' " +
+                     "GROUP BY u.idUtilisateur, u.nom, u.prenom ORDER BY ca DESC";
+        List<Object[]> list = new ArrayList<>();
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(new Object[]{rs.getString("prenom")+" "+rs.getString("nom"), rs.getDouble("ca")});
+            }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+        return list;
+    }
+
 }

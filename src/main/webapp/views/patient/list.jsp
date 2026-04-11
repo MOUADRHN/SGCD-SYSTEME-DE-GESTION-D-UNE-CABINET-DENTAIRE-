@@ -6,9 +6,11 @@
 <div class="main-content">
     <div class="topbar">
         <h4><i class="bi bi-people-fill me-2"></i>Gestion des Patients</h4>
-        <a href="${pageContext.request.contextPath}/patients?action=add" class="btn btn-mint">
-            <i class="bi bi-person-plus me-1"></i>Nouveau patient
-        </a>
+        <c:if test="${sessionScope.utilisateur.role != 'DENTISTE'}">
+           <a href="${pageContext.request.contextPath}/patients?action=add" class="btn btn-mint">
+           <i class="bi bi-calendar-plus me-1"></i>Nouveau patient
+         </a>
+       </c:if>
     </div>
     <jsp:include page="/views/common/flash.jsp"/>
     <div class="card mb-3">

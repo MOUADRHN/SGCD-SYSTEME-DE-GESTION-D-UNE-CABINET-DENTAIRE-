@@ -31,7 +31,7 @@ public class TestConnexion {
             + "&allowPublicKeyRetrieval=true";
 
     private static final String DB_USER     = "root";      // ← votre user MySQL
-    private static final String DB_PASSWORD = "";           // ← votre mot de passe MySQL
+    private static final String DB_PASSWORD = "root";           // ← votre mot de passe MySQL
     // ─────────────────────────────────────────────────────────────────────
 
     public static void main(String[] args) {

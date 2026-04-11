@@ -117,4 +117,27 @@ public class PatientRepository implements IRepository<Patient, Long> {
             return rs.next() ? rs.getInt(1) : 0;
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
+
+    /** Vérifie si un patient existe déjà avec le même nom ET la même date de naissance (anti-doublon). */
+    public boolean existsByNomDateNaissance(String nom, String prenom, java.time.LocalDate dateNaissance) {
+        String sql = "SELECT COUNT(*) FROM patient WHERE UPPER(nom)=UPPER(?) AND UPPER(prenom)=UPPER(?) AND dateNaissance=?";
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setString(2, prenom);
+            ps.setDate(3, Date.valueOf(dateNaissance));
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() && rs.getInt(1) > 0; }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    /** Idem mais exclut un patient existant (pour la modification). */
+    public boolean existsByNomDateNaissanceExcept(String nom, String prenom, java.time.LocalDate dateNaissance, Long idExclu) {
+        String sql = "SELECT COUNT(*) FROM patient WHERE UPPER(nom)=UPPER(?) AND UPPER(prenom)=UPPER(?) AND dateNaissance=? AND idPatient != ?";
+        try (Connection c = DBUtil.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setString(2, prenom);
+            ps.setDate(3, Date.valueOf(dateNaissance)); ps.setLong(4, idExclu);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() && rs.getInt(1) > 0; }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
 }

@@ -3,6 +3,7 @@
 <c:set var="pageTitle" value="Ajouter un patient"/>
 <jsp:include page="/views/common/header.jsp"/>
 <jsp:include page="/views/common/nav.jsp"/>
+
 <div class="main-content">
     <div class="topbar">
         <h4><i class="bi bi-person-plus me-2"></i>Nouveau Patient</h4>
@@ -29,6 +30,7 @@
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Date de naissance <span class="text-danger">*</span></label>
                         <input type="date" name="dateNaissance" class="form-control" required id="dn"
+                               min="<%= java.time.LocalDate.now().minusYears(120) %>"
                                max="<%= java.time.LocalDate.now() %>">
                     </div>
                     <div class="col-md-3">
@@ -61,7 +63,6 @@
                     </div>
                 </div>
 
-                <!-- Responsable légal -->
                 <div id="rl-block" class="mt-4 p-3 border rounded" style="background:#fffde7;display:none;">
                     <h6 class="fw-bold text-warning mb-3">
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>
@@ -98,10 +99,34 @@
         </div>
     </div>
 </div>
+
 <script>
-document.getElementById('dn').addEventListener('change', function() {
-    const age = Math.floor((Date.now() - new Date(this.value)) / (365.25 * 864e5));
-    document.getElementById('rl-block').style.display = age < 18 ? 'block' : 'none';
-});
+    document.getElementById('dn').addEventListener('change', function() {
+        if (!this.value) return;
+
+        // Calcul précis de l'âge tenant compte des mois/jours
+        const birthDate = new Date(this.value);
+        const today = new Date();
+
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+
+        // Validation : Si l'âge est négatif (date dans le futur) ou >= 120
+        // Note : On autorise 0 pour les bébés de moins d'un an (si vous voulez > 0 strict, remplacez par "age <= 0")
+        if (age < 0 || age >= 120) {
+            this.setCustomValidity("L'âge du patient doit être valide et inférieur à 120 ans.");
+            this.reportValidity(); // Affiche la bulle d'erreur native
+            document.getElementById('rl-block').style.display = 'none';
+        } else {
+            this.setCustomValidity(""); // Efface l'erreur, le formulaire peut être soumis
+
+            // Affichage du bloc tuteur si mineur
+            document.getElementById('rl-block').style.display = age < 18 ? 'block' : 'none';
+        }
+    });
 </script>
+
 <jsp:include page="/views/common/footer.jsp"/>

@@ -14,7 +14,6 @@
     </div>
     <jsp:include page="/views/common/flash.jsp"/>
 
-    <!-- KPI Cards -->
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="card stat-card h-100">
@@ -64,15 +63,16 @@
         </div>
     </div>
 
-    <!-- Agenda du jour -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center"
              style="background:var(--teal-dark);color:#fff;">
             <span><i class="bi bi-calendar3 me-2"></i>Agenda du jour</span>
-            <a href="${pageContext.request.contextPath}/rdv?action=add" class="btn btn-sm btn-mint">
-                <i class="bi bi-plus"></i> Nouveau RDV
-            </a>
-        </div>
+         <c:if test="${sessionScope.utilisateur.role != 'DENTISTE'}">
+             <a href="${pageContext.request.contextPath}/rdv?action=add" class="btn btn-mint">
+                 <i class="bi bi-calendar-plus me-1"></i>Nouveau RDV
+           </a>
+         </c:if>
+             </div>
         <div class="card-body p-0">
             <c:choose>
                 <c:when test="${empty rdvToday}">
@@ -84,29 +84,40 @@
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead>
-                                <tr>
-                                    <th>Heure</th><th>Patient</th><th>Dentiste</th>
-                                    <th>Motif</th><th>Statut</th><th>Action rapide</th>
-                                </tr>
+                            <tr>
+                                <th>Heure</th>
+                                <th>Patient</th>
+                                    <%-- Masquer la colonne Dentiste si c'est un Dentiste connecté --%>
+                                <c:if test="${sessionScope.utilisateur.role != 'DENTISTE'}">
+                                    <th>Dentiste</th>
+                                </c:if>
+                                <th>Motif</th>
+                                <th>Statut</th>
+                                <th>Action rapide</th>
+                            </tr>
                             </thead>
                             <tbody>
-                                <c:forEach var="rv" items="${rdvToday}">
+                            <c:forEach var="rv" items="${rdvToday}">
                                 <tr>
                                     <td class="fw-bold">${rv.dateHeure.toLocalTime()}</td>
                                     <td>
                                         <a href="${pageContext.request.contextPath}/patients?action=detail&id=${rv.idPatient}"
                                            class="text-decoration-none fw-semibold">
-                                            ${rv.nomCompletPatient}
+                                                ${rv.nomCompletPatient}
                                         </a>
                                     </td>
-                                    <td class="text-muted">${rv.nomCompletDentiste}</td>
+                                        <%-- Masquer le nom du Dentiste si c'est un Dentiste connecté --%>
+                                    <c:if test="${sessionScope.utilisateur.role != 'DENTISTE'}">
+                                        <td class="text-muted">${rv.nomCompletDentiste}</td>
+                                    </c:if>
                                     <td><span class="badge bg-secondary">${rv.motif.libelle}</span></td>
                                     <td>
                                         <span class="badge bg-${rv.statut.badgeColor}">
-                                            ${rv.statut.libelle}
+                                                ${rv.statut.libelle}
                                         </span>
                                     </td>
                                     <td>
+                                            <%-- 1. Boutons de gestion de file d'attente (Dispo pour tout le monde) --%>
                                         <c:if test="${rv.statut.name() eq 'PLANIFIE'}">
                                             <form method="post" action="${pageContext.request.contextPath}/rdv" class="d-inline">
                                                 <input type="hidden" name="action" value="statut">
@@ -117,6 +128,7 @@
                                                 </button>
                                             </form>
                                         </c:if>
+
                                         <c:if test="${rv.statut.name() eq 'EN_SALLE_ATTENTE'}">
                                             <form method="post" action="${pageContext.request.contextPath}/rdv" class="d-inline">
                                                 <input type="hidden" name="action" value="statut">
@@ -127,18 +139,49 @@
                                                 </button>
                                             </form>
                                         </c:if>
-                                        <c:if test="${rv.statut.name() eq 'EN_COURS'}">
-                                            <a href="${pageContext.request.contextPath}/consultation?action=ouvrir&idRdv=${rv.idRDV}"
-                                               class="btn btn-sm btn-success">
-                                                <i class="bi bi-clipboard2-pulse me-1"></i>Consultation
-                                            </a>
-                                        </c:if>
-                                        <c:if test="${rv.statut.name() eq 'TERMINE'}">
-                                            <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Terminé</span>
+
+                                            <%-- 2. Logique d'accès à la Consultation (Sécurisée selon le rôle) --%>
+                                        <c:if test="${rv.statut.name() eq 'EN_COURS' or rv.statut.name() eq 'TERMINE'}">
+                                            <c:choose>
+                                                <%-- Si l'utilisateur est le DENTISTE --%>
+                                                <c:when test="${sessionScope.utilisateur.role == 'DENTISTE'}">
+                                                    <c:choose>
+                                                        <c:when test="${rv.statut.name() eq 'TERMINE'}">
+                                                            <a href="${pageContext.request.contextPath}/consultation?action=detail&idRdv=${rv.idRDV}"
+                                                               class="btn btn-sm btn-info text-white">
+                                                                <i class="bi bi-eye"></i> Détails
+                                                            </a>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <a href="${pageContext.request.contextPath}/consultation?action=ouvrir&idRdv=${rv.idRDV}"
+                                                               class="btn btn-sm btn-success">
+                                                                <i class="bi bi-clipboard2-pulse me-1"></i>Consultation
+                                                            </a>
+                                                        </c:otherwise>
+                                                    </c:choose>
+                                                </c:when>
+
+                                                <%-- Si l'utilisateur est une ASSISTANTE --%>
+                                                <c:otherwise>
+                                                    <c:choose>
+                                                        <c:when test="${rv.statut.name() eq 'TERMINE'}">
+                                                            <a href="${pageContext.request.contextPath}/consultation?action=detail&idRdv=${rv.idRDV}"
+                                                               class="btn btn-sm btn-info text-white">
+                                                                <i class="bi bi-receipt"></i> Détails
+                                                            </a>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <button class="btn btn-sm btn-outline-secondary" disabled title="Réservé au dentiste">
+                                                                <i class="bi bi-lock-fill"></i> Réservé
+                                                            </button>
+                                                        </c:otherwise>
+                                                    </c:choose>
+                                                </c:otherwise>
+                                            </c:choose>
                                         </c:if>
                                     </td>
                                 </tr>
-                                </c:forEach>
+                            </c:forEach>
                             </tbody>
                         </table>
                     </div>
